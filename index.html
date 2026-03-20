@@ -1,28 +1,144 @@
 <!DOCTYPE html>
 <html lang="en-us">
   <head>
-    <meta charset="utf-8">
-    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <meta charset="utf-8" />
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
     <title>Unity WebGL Player | EpicPC</title>
-    <link rel="shortcut icon" href="TemplateData/favicon.ico">
-    <link rel="stylesheet" href="TemplateData/style.css">
+    <link rel="shortcut icon" href="TemplateData/favicon.ico" />
+    <link rel="stylesheet" href="TemplateData/style.css" />
+    <style>
+      #file-import-panel {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(0, 0, 0, 0.88);
+        z-index: 20;
+      }
+
+      #file-import-card {
+        width: min(92vw, 640px);
+        background: #1d1d1d;
+        color: #fff;
+        border: 1px solid #444;
+        border-radius: 12px;
+        padding: 20px;
+        box-sizing: border-box;
+        font-family: Arial, sans-serif;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+      }
+
+      #file-import-card h2 {
+        margin: 0 0 12px 0;
+        font-size: 24px;
+      }
+
+      #file-import-card p,
+      #file-import-card li,
+      #file-import-card label,
+      #file-import-card div {
+        font-size: 14px;
+        line-height: 1.45;
+      }
+
+      #file-import-card ul {
+        margin: 10px 0 16px 18px;
+        padding: 0;
+      }
+
+      .import-row {
+        margin: 12px 0;
+      }
+
+      .import-row input[type="file"] {
+        display: block;
+        margin-top: 6px;
+        width: 100%;
+        color: #fff;
+      }
+
+      .file-status {
+        margin-top: 6px;
+        color: #cfcfcf;
+        word-break: break-all;
+      }
+
+      #start-game-button {
+        margin-top: 18px;
+        padding: 12px 18px;
+        border: none;
+        border-radius: 8px;
+        background: #2f7df6;
+        color: #fff;
+        font-size: 15px;
+        cursor: pointer;
+      }
+
+      #start-game-button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+
+      #import-error {
+        margin-top: 14px;
+        color: #ff8080;
+        white-space: pre-wrap;
+      }
+
+      #unity-container {
+        position: relative;
+      }
+    </style>
   </head>
   <body>
     <div id="unity-container" class="unity-desktop">
-      <canvas id="unity-canvas" width=960 height=600></canvas>
-      <div id="unity-loading-bar">
+      <canvas id="unity-canvas" width="960" height="600"></canvas>
+
+      <div id="file-import-panel">
+        <div id="file-import-card">
+          <h2>Import required game files</h2>
+          <p>
+            This site hosts the small launcher files, but you must provide the two large game files locally each session before the game can start.
+          </p>
+          <ul>
+            <li><strong>Epicweb.data</strong></li>
+            <li><strong>Epicweb.wasm</strong></li>
+          </ul>
+
+          <div class="import-row">
+            <label for="data-file-input"><strong>Select Epicweb.data</strong></label>
+            <input id="data-file-input" type="file" />
+            <div id="data-file-status" class="file-status">No file selected.</div>
+          </div>
+
+          <div class="import-row">
+            <label for="wasm-file-input"><strong>Select Epicweb.wasm</strong></label>
+            <input id="wasm-file-input" type="file" />
+            <div id="wasm-file-status" class="file-status">No file selected.</div>
+          </div>
+
+          <button id="start-game-button" disabled>Start Game</button>
+          <div id="import-error"></div>
+        </div>
+      </div>
+
+      <div id="unity-loading-bar" style="display: none;">
         <div id="unity-logo"></div>
         <div id="unity-progress-bar-empty">
           <div id="unity-progress-bar-full"></div>
         </div>
       </div>
-      <div id="unity-warning"> </div>
+
+      <div id="unity-warning"></div>
+
       <div id="unity-footer">
         <div id="unity-webgl-logo"></div>
         <div id="unity-fullscreen-button"></div>
         <div id="unity-build-title">EpicPC</div>
       </div>
     </div>
+
     <script>
       var container = document.querySelector("#unity-container");
       var canvas = document.querySelector("#unity-canvas");
@@ -31,91 +147,193 @@
       var fullscreenButton = document.querySelector("#unity-fullscreen-button");
       var warningBanner = document.querySelector("#unity-warning");
 
-      // Shows a temporary message banner/ribbon for a few seconds, or
-      // a permanent error message on top of the canvas if type=='error'.
-      // If type=='warning', a yellow highlight color is used.
-      // Modify or remove this function to customize the visually presented
-      // way that non-critical warnings and error messages are presented to the
-      // user.
-      function unityShowBanner(msg, type) {
-        function updateBannerVisibility() {
-          warningBanner.style.display = warningBanner.children.length ? 'block' : 'none';
-        }
-        var div = document.createElement('div');
-        div.innerHTML = msg;
-        warningBanner.appendChild(div);
-        if (type == 'error') div.style = 'background: red; padding: 10px;';
-        else {
-          if (type == 'warning') div.style = 'background: yellow; padding: 10px;';
-          setTimeout(function() {
-            warningBanner.removeChild(div);
-            updateBannerVisibility();
-          }, 5000);
-        }
-        updateBannerVisibility();
-      }
+      var importPanel = document.querySelector("#file-import-panel");
+      var dataInput = document.querySelector("#data-file-input");
+      var wasmInput = document.querySelector("#wasm-file-input");
+      var dataStatus = document.querySelector("#data-file-status");
+      var wasmStatus = document.querySelector("#wasm-file-status");
+      var startGameButton = document.querySelector("#start-game-button");
+      var importError = document.querySelector("#import-error");
 
       var buildUrl = "Build";
       var loaderUrl = buildUrl + "/Epicweb.loader.js";
-      var config = {
-        dataUrl: buildUrl + "/Epicweb.data",
-        frameworkUrl: buildUrl + "/Epicweb.framework.js",
-        codeUrl: buildUrl + "/Epicweb.wasm",
-        streamingAssetsUrl: "StreamingAssets",
-        companyName: "Rovio Entertainment Ltd.",
-        productName: "EpicPC",
-        productVersion: "2.0.25241.4080",
-        showBanner: unityShowBanner,
-      };
+      var frameworkUrl = buildUrl + "/Epicweb.framework.js";
 
-      // By default Unity keeps WebGL canvas render target size matched with
-      // the DOM size of the canvas element (scaled by window.devicePixelRatio)
-      // Set this to false if you want to decouple this synchronization from
-      // happening inside the engine, and you would instead like to size up
-      // the canvas DOM size and WebGL render target sizes yourself.
-      // config.matchWebGLToCanvasSize = false;
+      var selectedDataFile = null;
+      var selectedWasmFile = null;
+      var createdObjectUrls = [];
 
-      if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
-        // Mobile device style: fill the whole browser client area with the game canvas:
+      function unityShowBanner(msg, type) {
+        function updateBannerVisibility() {
+          warningBanner.style.display = warningBanner.children.length ? "block" : "none";
+        }
 
-        var meta = document.createElement('meta');
-        meta.name = 'viewport';
-        meta.content = 'width=device-width, height=device-height, initial-scale=1.0, user-scalable=no, shrink-to-fit=yes';
-        document.getElementsByTagName('head')[0].appendChild(meta);
-        container.className = "unity-mobile";
+        var div = document.createElement("div");
+        div.innerHTML = msg;
+        warningBanner.appendChild(div);
 
-        // To lower canvas resolution on mobile devices to gain some
-        // performance, uncomment the following line:
-        // config.devicePixelRatio = 1;
+        if (type == "error") {
+          div.style = "background: red; padding: 10px;";
+        } else {
+          if (type == "warning") {
+            div.style = "background: yellow; padding: 10px;";
+          }
+          setTimeout(function () {
+            if (div.parentNode === warningBanner) {
+              warningBanner.removeChild(div);
+              updateBannerVisibility();
+            }
+          }, 5000);
+        }
 
-        canvas.style.width = window.innerWidth + 'px';
-        canvas.style.height = window.innerHeight + 'px';
-
-        unityShowBanner('WebGL builds are not supported on mobile devices.');
-      } else {
-        // Desktop style: Render the game canvas in a window that can be maximized to fullscreen:
-
-        canvas.style.width = "960px";
-        canvas.style.height = "600px";
+        updateBannerVisibility();
       }
 
-      loadingBar.style.display = "block";
+      function formatBytes(bytes) {
+        if (bytes === 0) return "0 B";
+        var units = ["B", "KB", "MB", "GB"];
+        var i = Math.floor(Math.log(bytes) / Math.log(1024));
+        return (bytes / Math.pow(1024, i)).toFixed(i === 0 ? 0 : 2) + " " + units[i];
+      }
 
-      var script = document.createElement("script");
-      script.src = loaderUrl;
-      script.onload = () => {
-        createUnityInstance(canvas, config, (progress) => {
-          progressBarFull.style.width = 100 * progress + "%";
-        }).then((unityInstance) => {
+      function clearImportError() {
+        importError.textContent = "";
+      }
+
+      function setImportError(message) {
+        importError.textContent = message;
+      }
+
+      function refreshStartButton() {
+        startGameButton.disabled = !(selectedDataFile && selectedWasmFile);
+      }
+
+      function validateNamedFile(file, expectedName, label) {
+        if (!file) {
+          return label + " is missing.";
+        }
+        if (file.name !== expectedName) {
+          return label + ' must be exactly "' + expectedName + '". You selected "' + file.name + '".';
+        }
+        return "";
+      }
+
+      function handleFileInputsChanged() {
+        clearImportError();
+
+        selectedDataFile = dataInput.files && dataInput.files[0] ? dataInput.files[0] : null;
+        selectedWasmFile = wasmInput.files && wasmInput.files[0] ? wasmInput.files[0] : null;
+
+        dataStatus.textContent = selectedDataFile
+          ? selectedDataFile.name + " — " + formatBytes(selectedDataFile.size)
+          : "No file selected.";
+
+        wasmStatus.textContent = selectedWasmFile
+          ? selectedWasmFile.name + " — " + formatBytes(selectedWasmFile.size)
+          : "No file selected.";
+
+        refreshStartButton();
+      }
+
+      function revokeCreatedObjectUrls() {
+        for (var i = 0; i < createdObjectUrls.length; i++) {
+          URL.revokeObjectURL(createdObjectUrls[i]);
+        }
+        createdObjectUrls = [];
+      }
+
+      function createObjectUrlForFile(file) {
+        var url = URL.createObjectURL(file);
+        createdObjectUrls.push(url);
+        return url;
+      }
+
+      function startUnityWithImportedFiles() {
+        clearImportError();
+
+        var dataValidationError = validateNamedFile(selectedDataFile, "Epicweb.data", "Data file");
+        if (dataValidationError) {
+          setImportError(dataValidationError);
+          return;
+        }
+
+        var wasmValidationError = validateNamedFile(selectedWasmFile, "Epicweb.wasm", "WASM file");
+        if (wasmValidationError) {
+          setImportError(wasmValidationError);
+          return;
+        }
+
+        revokeCreatedObjectUrls();
+
+        var importedDataUrl = createObjectUrlForFile(selectedDataFile);
+        var importedWasmUrl = createObjectUrlForFile(selectedWasmFile);
+
+        var config = {
+          dataUrl: importedDataUrl,
+          frameworkUrl: frameworkUrl,
+          codeUrl: importedWasmUrl,
+          streamingAssetsUrl: "StreamingAssets",
+          companyName: "Rovio Entertainment Ltd.",
+          productName: "EpicPC",
+          productVersion: "2.0.25241.4080",
+          showBanner: unityShowBanner
+        };
+
+        if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
+          var meta = document.createElement("meta");
+          meta.name = "viewport";
+          meta.content =
+            "width=device-width, height=device-height, initial-scale=1.0, user-scalable=no, shrink-to-fit=yes";
+          document.getElementsByTagName("head")[0].appendChild(meta);
+          container.className = "unity-mobile";
+
+          canvas.style.width = window.innerWidth + "px";
+          canvas.style.height = window.innerHeight + "px";
+
+          unityShowBanner("WebGL builds are not supported on mobile devices.");
+        } else {
+          canvas.style.width = "960px";
+          canvas.style.height = "600px";
+        }
+
+        importPanel.style.display = "none";
+        loadingBar.style.display = "block";
+        startGameButton.disabled = true;
+
+        var script = document.createElement("script");
+        script.src = loaderUrl;
+
+        script.onload = function () {
+          createUnityInstance(canvas, config, function (progress) {
+            progressBarFull.style.width = 100 * progress + "%";
+          })
+            .then(function (unityInstance) {
+              loadingBar.style.display = "none";
+              fullscreenButton.onclick = function () {
+                unityInstance.SetFullscreen(1);
+              };
+            })
+            .catch(function (message) {
+              importPanel.style.display = "flex";
+              loadingBar.style.display = "none";
+              refreshStartButton();
+              alert(message);
+            });
+        };
+
+        script.onerror = function () {
+          importPanel.style.display = "flex";
           loadingBar.style.display = "none";
-          fullscreenButton.onclick = () => {
-            unityInstance.SetFullscreen(1);
-          };
-        }).catch((message) => {
-          alert(message);
-        });
-      };
-      document.body.appendChild(script);
+          refreshStartButton();
+          setImportError("Failed to load Build/Epicweb.loader.js. Make sure the small hosted build files are uploaded correctly.");
+        };
+
+        document.body.appendChild(script);
+      }
+
+      dataInput.addEventListener("change", handleFileInputsChanged);
+      wasmInput.addEventListener("change", handleFileInputsChanged);
+      startGameButton.addEventListener("click", startUnityWithImportedFiles);
     </script>
   </body>
 </html>
